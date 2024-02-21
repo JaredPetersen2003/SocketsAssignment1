@@ -30,7 +30,7 @@ def udp_listner(serverSocket):
         serverSocket.sendto(modifiedMessage.encode(),
         clientAddress)
 
-udp_start()
+#udp_start()
 
 clientSocket.close()
 
