@@ -7,6 +7,7 @@ def accept(sock, mask):
     conn, addr = sock.accept()  
     print("Client " + str(addr) + " connected!")
     print("Active client" + str(clients))
+    clients.append(conn)
     conn.setblocking(False)
     # Register the socket to be monitored with the selector
     sel.register(conn, selectors.EVENT_READ, read)
@@ -16,6 +17,8 @@ def read(conn, mask):
     data = conn.recv(1024)  
     if data:
         print(data)
+        UDPSocket.sendto(data, ('localhost', 12001))
+        
 
 
 #Configure Server
@@ -29,6 +32,10 @@ serverSocket.setblocking(False)
 clients = []
 sel = selectors.DefaultSelector()
 sel.register(serverSocket, selectors.EVENT_READ, accept) # Register socket to selector
+
+
+UDPSocket = socket(AF_INET, SOCK_DGRAM)
+
 print("Server ready")
 
 def main():

@@ -16,7 +16,7 @@ clientSocket.send(message.encode())
 
 
 def udp_start():
-    serverPort = 12000
+    serverPort = 12001
     serverSocket = socket(AF_INET, SOCK_DGRAM)
     serverSocket.bind(('', serverPort))
     print('The server is ready to receive')
@@ -26,11 +26,10 @@ def udp_start():
 def udp_listner(serverSocket):
     while True:
         msg, clientAddress = serverSocket.recvfrom(2048)
-        modifiedMessage = message.decode().upper()
-        serverSocket.sendto(modifiedMessage.encode(),
-        clientAddress)
+        print(msg.decode())
+        
 
-#udp_start()
+udp_start()
 
 clientSocket.close()
 
