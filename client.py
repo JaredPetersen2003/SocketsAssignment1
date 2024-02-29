@@ -2,26 +2,22 @@ import random
 from socket import *
 import threading
 
-#configure client
-serverName = 'localhost'
-serverPort = 12001
-clientSocket = socket(AF_INET, SOCK_STREAM)
-clientSocket.connect((serverName, serverPort))
-DISCONNECT = 'DISCONNECT'
-connected = True
-message = 'login'
-
-
-    
+  
 #send message
 def send_message():
     global connected 
     while connected:
         message = input()
-        clientSocket.send(message.encode())
+        
         if message == DISCONNECT:
             connected = False
+            
+        if message.split('#')[0] == "UDP":
+            print("Connection request sent")
+            serverSocket.sendto(message.split('#')[1].encode(), clientUDPPort)
             break
+        
+        clientSocket.send(message.encode())
     serverSocket.close()
     clientSocket.close()
     print("Connection closed")
@@ -38,21 +34,40 @@ def tcp_listner():
     while connected:
         message = clientSocket.recv(1024)
         print(message.decode())
+        #Connection request received, send UDP port to client
+        if (message.decode().split('#')[0] == "REQ"):
+            clientSocket.send(("UDP#" + str(UDPPort) + "#" + message.decode().split('#')[1] + "#" + message.decode().split('#')[2]).encode())
+            
+        #UDP port received
+        if (message.decode().split('#')[0] == "CONN"):
+            print("UDP port received")
+            #TODO implement P2P communication
+            clientUDPPort = (message.decode().split('#')[1], int(message.decode().split('#')[2]))
+            serverSocket.sendto("P2P".encode(), (message.decode().split('#')[1].encode(), int(message.decode().split('#')[2])))
     print("TCP listener closed")
 
 def tcp_start():
     tcp = threading.Thread(target=tcp_listner)
     tcp.start()
     
+#configure client
+serverName = 'localhost'
+serverPort = 12002
+clientSocket = socket(AF_INET, SOCK_STREAM)
+clientSocket.connect((serverName, serverPort))
+DISCONNECT = 'DISCONNECT'
+connected = True
+
 
 # Configure UDP server
-serverPort = random.randint(8000, 12003)
+UDPPort = random.randint(8000, 12003)
 serverSocket = socket(AF_INET, SOCK_DGRAM)
-serverSocket.bind(('', serverPort))
+serverSocket.bind(('', UDPPort))
 print('The server is ready to receive')
 udp = threading.Thread(target=udp_listner, args=(serverSocket,))
 udp.start()
 
+clientUDPPort =  (0, 0)
 
 
 tcp_start()
