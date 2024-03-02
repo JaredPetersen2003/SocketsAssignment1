@@ -11,11 +11,10 @@ def send_message():
         
         if message == DISCONNECT:
             connected = False
-            
-        if message.split('#')[0] == "UDP":
-            print("Connection request sent")
-            serverSocket.sendto(message.split('#')[1].encode(), clientUDPPort)
-            break
+        
+        if message.split(' ')[0] == "MESS":
+            serverSocket.sendto(message.split(' ')[1].encode(), clientUDPPort)
+            continue
         
         clientSocket.send(message.encode())
     serverSocket.close()
@@ -31,19 +30,24 @@ def udp_listner(serverSocket):
         
 def tcp_listner():
     global connected 
+    global clientUDPPort
     while connected:
         message = clientSocket.recv(1024)
         print(message.decode())
         #Connection request received, send UDP port to client
-        if (message.decode().split('#')[0] == "REQ"):
-            clientSocket.send(("UDP#" + str(UDPPort) + "#" + message.decode().split('#')[1] + "#" + message.decode().split('#')[2]).encode())
+        if (message.decode().split(' ')[0] == "REQ"):
+            clientSocket.send(("UDP " + str(UDPPort) + " " + message.decode().split(' ')[1] + " " + message.decode().split(' ')[2]).encode())
+            clientUDPPort = (message.decode().split(' ')[1], int(message.decode().split(' ')[2]))
+            clientSocket.send("CHATTING".encode())
             
         #UDP port received
-        if (message.decode().split('#')[0] == "CONN"):
+        if (message.decode().split(' ')[0] == "CONN"):
             print("UDP port received")
             #TODO implement P2P communication
-            clientUDPPort = (message.decode().split('#')[1], int(message.decode().split('#')[2]))
-            serverSocket.sendto("P2P".encode(), (message.decode().split('#')[1].encode(), int(message.decode().split('#')[2])))
+            clientUDPPort = (message.decode().split(' ')[1], int(message.decode().split(' ')[2]))
+            serverSocket.sendto(("Now Chatting on " + str(UDPPort)).encode(), clientUDPPort)
+            clientSocket.send("CHATTING".encode())
+        
     print("TCP listener closed")
 
 def tcp_start():
@@ -52,7 +56,7 @@ def tcp_start():
     
 #configure client
 serverName = 'localhost'
-serverPort = 12002
+serverPort = 12005
 clientSocket = socket(AF_INET, SOCK_STREAM)
 clientSocket.connect((serverName, serverPort))
 DISCONNECT = 'DISCONNECT'

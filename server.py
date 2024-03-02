@@ -1,17 +1,22 @@
 from socket import *
 import selectors
 
+# Define a dictionary to store the state of each client
+client_states = {}
+
 
 def handle_login(conn, mask):
     data = conn.recv(1024)
     if data:
         print(data.decode()[:3])
-        if data.decode().split('#')[0] == "login":
+        if data.decode().split(' ')[0] == "login":
             print("Login request received")
             # TODO implement login
             conn.send("Login successful".encode())
             sel.unregister(conn)
             sel.register(conn, selectors.EVENT_READ, read)
+            # Set the state of the client to "online"
+            client_states[conn] = "online"
         if data.decode()[:5] == "regis":
             print("Registration request received")
             # TODO implement registration
@@ -44,37 +49,45 @@ def read(conn, mask):
             clients.remove(conn)
             conn.close()
             
+        if data.decode() == "LISTENING":
+            print("Client " + str(conn.getpeername()) + " is listening!")
+            client_states[conn] = "listening"
+            
+        if data.decode() == "CHATTING":
+            print("Client " + str(conn.getpeername()) + " is chatting!")
+            client_states[conn] = "chatting"
+            
         #Send list of clients
         if data.decode() == "GETC":
             print("GET request received")
-            active_clients = [str(client.getpeername()) for client in clients if client.fileno() != conn.fileno()]
+            active_clients = [(str(client.getpeername()) + " " + client_states[client])  for client in clients if client.fileno() != conn.fileno()]
             conn.send("\n".join(active_clients).encode())
             
         #Connect to client
-        if data.decode().split('#')[0] == "CONN":
+        if data.decode().split(' ')[0] == "CONN":
             print("Connection request received")
             # TODO implement 
             for client in clients:
-                if client.getpeername() == (data.decode().split('#')[1], int(data.decode().split('#')[2])):
+                if client.getpeername() == (data.decode().split(' ')[1], int(data.decode().split(' ')[2])):
                     print("Connection request sent")
-                    client.send(("REQ#" + conn.getpeername()[0] + "#" + str(conn.getpeername()[1])).encode())
+                    client.send(("REQ " + conn.getpeername()[0] + " " + str(conn.getpeername()[1])).encode()) 
                     conn.send("Connection request sent".encode())
                     break
             
             
         # Receive UDP port from client
-        if data.decode().split('#')[0] == "UDP":
+        if data.decode().split(' ')[0] == "UDP":
             print("UDP port received")
             for client in clients:
-                if client.getpeername() == (data.decode().split('#')[2], int(data.decode().split('#')[3])):
+                if client.getpeername() == (data.decode().split(' ')[2], int(data.decode().split(' ')[3])):
                     print("UDP port sent")
-                    client.send(("CONN#" + conn.getpeername()[0] + "#" + data.decode().split('#')[1]).encode())
+                    client.send(("CONN " + conn.getpeername()[0] + " " + data.decode().split(' ')[1]).encode())
                     break
 
 
 #Configure Server
 print("Setting up server")
-serverPort = 12002
+serverPort = 12005
 serverSocket = socket(AF_INET, SOCK_STREAM)
 serverSocket.bind(('', serverPort))
 serverSocket.listen(1)
