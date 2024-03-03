@@ -1,28 +1,9 @@
 from socket import *
 import selectors
+import threading
 
 # Define a dictionary to store the state of each client
 client_states = {}
-
-
-def handle_login(conn, mask):
-    data = conn.recv(1024)
-    if data:
-        print(data.decode()[:3])
-        if data.decode().split(' ')[0] == "login":
-            print("Login request received")
-            # TODO implement login
-            conn.send("Login successful".encode())
-            sel.unregister(conn)
-            sel.register(conn, selectors.EVENT_READ, read)
-            # Set the state of the client to "online"
-            client_states[conn] = "online"
-        if data.decode()[:5] == "regis":
-            print("Registration request received")
-            # TODO implement registration
-            conn.send("Registration successful".encode())
-            sel.unregister(conn)
-            sel.register(conn, selectors.EVENT_READ, read)
     
 
 # Accept incoming connections
@@ -34,41 +15,63 @@ def accept(sock, mask):
     print("Active client" + str(clients))
     # TODO better way to handle an active list of clients
     conn.setblocking(False)
-    # Register the socket to be monitored with the selector
-    sel.register(conn, selectors.EVENT_READ, handle_login)
+ 
+    
 
 # Read incoming messages
 def read(conn, mask):
-    data = conn.recv(1024)  
-    if data:
-        print(data)
+    while True:
+        data = conn.recv(HEADER)  # Receive the message length header
+        if data:
+            msg_length = int(data)  # Unpack the message length as an unsigned integer
+            full_data = b""
+            while len(full_data) < msg_length:
+                remaining_bytes = min(msg_length - len(full_data), 1024)
+                try:
+                    data = conn.recv(remaining_bytes)
+                except:
+                    print("Error receiving message")
+             
+                if not data:
+                    break
+                full_data += data
+
+            if len(full_data) == msg_length:
+                handle_received_message(full_data, conn)
+            else:
+                print("Incomplete message received")
+    
+    
+            
+def handle_received_message(msg, conn):
         # client disconnected
-        if data.decode() == "DISCONNECT":
+        msg = msg.decode()
+        print("Received message: " + msg)
+        if msg == "DISCONNECT":
             print("Client " + str(conn.getpeername()) + " disconnected!")
-            sel.unregister(conn)
             clients.remove(conn)
             conn.close()
             
-        if data.decode() == "LISTENING":
+        if msg == "LISTENING":
             print("Client " + str(conn.getpeername()) + " is listening!")
             client_states[conn] = "listening"
             
-        if data.decode() == "CHATTING":
+        if msg == "CHATTING":
             print("Client " + str(conn.getpeername()) + " is chatting!")
             client_states[conn] = "chatting"
             
         #Send list of clients
-        if data.decode() == "GETC":
+        if msg == "GETC":
             print("GET request received")
             active_clients = [(str(client.getpeername()) + " " + client_states[client])  for client in clients if client.fileno() != conn.fileno()]
             conn.send("\n".join(active_clients).encode())
             
         #Connect to client
-        if data.decode().split(' ')[0] == "CONN":
+        if msg.split(' ')[0] == "CONN":
             print("Connection request received")
             # TODO implement 
             for client in clients:
-                if (client.getpeername() == (data.decode().split(' ')[1], int(data.decode().split(' ')[2]))):
+                if (client.getpeername() == (msg.split(' ')[1], int(msg.split(' ')[2]))):
                     
                     # Stops connection request if client is not listening
                     if (client_states[client] != "listening"):
@@ -78,34 +81,36 @@ def read(conn, mask):
                     
                     # REQ UDP details
                     print("Connection request sent")
-                    client.send(("REQ " + conn.getpeername()[0] + " " + str(conn.getpeername()[1])).encode()) 
+                    client.send(("REQ " + conn.getpeername()[0] + " " + str(conn.getpeername()[1]) + " " + msg.split(' ')[3]).encode()) 
                     conn.send("Connection request sent".encode())
                     break
             
             
         # Receive UDP port from client
-        if data.decode().split(' ')[0] == "UDP":
+        if msg.split(' ')[0] == "UDP":
             print("UDP port received")
             for client in clients:
-                if client.getpeername() == (data.decode().split(' ')[2], int(data.decode().split(' ')[3])):
+                if client.getpeername() == (msg.split(' ')[2], int(msg.split(' ')[3])):
                     print("UDP port sent")
-                    client.send(("CONN " + conn.getpeername()[0] + " " + data.decode().split(' ')[1]).encode())
+                    client.send(("SUCC " + conn.getpeername()[0] + " " + msg.split(' ')[1]).encode())
                     client_states[conn] = "chatting"
                     break
 
 
+# Message header length
+HEADER = 64
+
 #Configure Server
 print("Setting up server")
-serverPort = 12008
+serverPort = 12002
 serverSocket = socket(AF_INET, SOCK_STREAM)
 serverSocket.bind(('', serverPort))
-serverSocket.listen(1)
-serverSocket.setblocking(False)
+serverSocket.listen(5)
+
 
 # Keep a list of clients
 clients = []
-sel = selectors.DefaultSelector()
-sel.register(serverSocket, selectors.EVENT_READ, accept) # Register socket to selector
+
 
 
 UDPSocket = socket(AF_INET, SOCK_DGRAM)
@@ -116,10 +121,15 @@ def main():
     
     # Receive incoming messages
     while True:
-        events = sel.select(timeout=None)
-        for key, mask in events:
-            callback = key.data
-            callback(key.fileobj, mask)
+        conn, addr = serverSocket.accept()
+        client = threading.Thread(target=read, args=(conn, addr))
+        client.start()
+        clients.append(conn)
+    
+        print("Client " + str(addr) + " connected!")
+        client_states[conn] = "online"
+    
+        
 
 if __name__ == "__main__":
     main()

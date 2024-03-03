@@ -14,19 +14,32 @@ def send_message():
             connected = False
         
         if message.split(' ')[0] == "MESS":
-            serverSocket.sendto(message.split(' ')[1].encode(), clientUDPPort)
+            serverSocket.sendto(message[5:].encode(), clientUDPPort)
             continue
         
         if message.split(' ')[0] == "STOP":
             serverSocket.sendto("STOP".encode(), clientUDPPort)
             clientUDPPort = (0, 0)
-            clientSocket.send("LISTENING".encode())
+            send("LISTENING")
             continue
         
-        clientSocket.send(message.encode())
+        if message.split(' ')[0] == "CONN":
+            message += " " + str(UDPPort)
+            send(message)
+            continue
+        
+        send(message)
     serverSocket.close()
     clientSocket.close()
     print("Connection closed")
+    
+def send(msg):
+    message = msg.encode()
+    message_length = len(message)
+    send_length = str(message_length).encode()
+    send_length += b' ' * (HEADER - len(send_length))
+    clientSocket.send(send_length)
+    clientSocket.send(message)
 
 def udp_listner(serverSocket):
     global connected 
@@ -34,7 +47,7 @@ def udp_listner(serverSocket):
     while connected:
         msg, clientAddress = serverSocket.recvfrom(2048)
         if msg.decode() == "STOP":
-            clientSocket.send("LISTENING".encode())
+            send("LISTENING")
             print(str(clientUDPPort) + " has stopped chatting, now listening")
             clientUDPPort = (0, 0)
             continue
@@ -50,17 +63,19 @@ def tcp_listner():
         print(message.decode())
         #Connection request received, send UDP port to client
         if (message.decode().split(' ')[0] == "REQ"):
-            clientSocket.send(("UDP " + str(UDPPort) + " " + message.decode().split(' ')[1] + " " + message.decode().split(' ')[2]).encode())
-            clientUDPPort = (message.decode().split(' ')[1], int(message.decode().split(' ')[2]))
+            msg = "UDP " + str(UDPPort) + " " + message.decode().split(' ')[1] + " " + message.decode().split(' ')[2]
+            send(msg)
+            clientUDPPort = (message.decode().split(' ')[1], int(message.decode().split(' ')[3]))
             continue
             
         #UDP port received
-        if (message.decode().split(' ')[0] == "CONN"):
+        if (message.decode().split(' ')[0] == "SUCC"):
             print("UDP port received")
             #TODO implement P2P communication
             clientUDPPort = (message.decode().split(' ')[1], int(message.decode().split(' ')[2]))
             serverSocket.sendto(("Now Chatting on " + str(UDPPort)).encode(), clientUDPPort)
-            clientSocket.send("CHATTING".encode())
+            send("CHATTING")
+            
             
         
     print("TCP listener closed")
@@ -68,10 +83,13 @@ def tcp_listner():
 def tcp_start():
     tcp = threading.Thread(target=tcp_listner)
     tcp.start()
+
+#
+HEADER = 64
     
 #configure client
 serverName = 'localhost'
-serverPort = 12008
+serverPort = 12002
 clientSocket = socket(AF_INET, SOCK_STREAM)
 clientSocket.connect((serverName, serverPort))
 DISCONNECT = 'DISCONNECT'
