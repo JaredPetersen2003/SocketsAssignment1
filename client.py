@@ -71,7 +71,6 @@ def tcp_listner():
         #UDP port received
         if (message.decode().split(' ')[0] == "SUCC"):
             print("UDP port received")
-            #TODO implement P2P communication
             clientUDPPort = (message.decode().split(' ')[1], int(message.decode().split(' ')[2]))
             serverSocket.sendto(("Now Chatting on " + str(UDPPort)).encode(), clientUDPPort)
             send("CHATTING")

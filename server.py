@@ -4,6 +4,7 @@ import threading
 
 # Define a dictionary to store the state of each client
 client_states = {}
+chatroom = []
     
 
 # Accept incoming connections
@@ -52,6 +53,7 @@ def handle_received_message(msg, conn):
             clients.remove(conn)
             conn.close()
             
+            
         if msg == "LISTENING":
             print("Client " + str(conn.getpeername()) + " is listening!")
             client_states[conn] = "listening"
@@ -95,6 +97,14 @@ def handle_received_message(msg, conn):
                     client.send(("SUCC " + conn.getpeername()[0] + " " + msg.split(' ')[1]).encode())
                     client_states[conn] = "chatting"
                     break
+                
+        if msg.split(' ')[0] == "CHAT":
+            if conn not in chatroom:
+                chatroom.append(conn)
+                client_states[conn] = "chatting"
+                
+        
+                
 
 
 # Message header length
