@@ -7,18 +7,6 @@ client_states = {}
 chatroom = []
     
 
-# Accept incoming connections
-def accept(sock, mask):
-    conn, addr = sock.accept()  
-    clients.append(conn)
-    
-    print("Client " + str(addr) + " connected!")
-    print("Active client" + str(clients))
-    # TODO better way to handle an active list of clients
-    conn.setblocking(False)
- 
-    
-
 # Read incoming messages
 def read(conn, mask):
     while True:
@@ -102,6 +90,12 @@ def handle_received_message(msg, conn):
             if conn not in chatroom:
                 chatroom.append(conn)
                 client_states[conn] = "chatting"
+                conn.send("Joined Chatroom".encode())
+            else:
+                message = "("  + str(conn.getpeername()) + ") " + msg[5:] 
+                for client in chatroom:
+                    if client.fileno() != conn.fileno():
+                        client.send(message.encode())
                 
         
                 
@@ -129,7 +123,7 @@ print("Server ready")
 
 def main():
     
-    # Receive incoming messages
+    # Receive incoming connections
     while True:
         conn, addr = serverSocket.accept()
         client = threading.Thread(target=read, args=(conn, addr))
