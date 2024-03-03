@@ -14,9 +14,20 @@ def send_custom_messages():
     while True:
         user_input = input("Enter custom message for client2: ")
         if user_input.lower() == 'exit':
+            send("EXIT")
             break
+        elif user_input.lower() == 'get_clients':
+            send("GETC")
         else:
-            clientSocket.send(user_input.encode())
+            send("CUSTOM " + user_input)
+
+def send(msg):
+    message = msg.encode()
+    message_length = len(message)
+    send_length = str(message_length).encode()
+    send_length += b' ' * (HEADER - len(send_length))
+    clientSocket.send(send_length)
+    clientSocket.send(message)
 
 #configue client
 serverName = 'localhost'
