@@ -68,7 +68,15 @@ def read(conn, mask):
             print("Connection request received")
             # TODO implement 
             for client in clients:
-                if client.getpeername() == (data.decode().split(' ')[1], int(data.decode().split(' ')[2])):
+                if (client.getpeername() == (data.decode().split(' ')[1], int(data.decode().split(' ')[2]))):
+                    
+                    # Stops connection request if client is not listening
+                    if (client_states[client] != "listening"):
+                        print("Client is not listening")
+                        conn.send("Client is not listening".encode())
+                        break
+                    
+                    # REQ UDP details
                     print("Connection request sent")
                     client.send(("REQ " + conn.getpeername()[0] + " " + str(conn.getpeername()[1])).encode()) 
                     conn.send("Connection request sent".encode())
@@ -82,12 +90,13 @@ def read(conn, mask):
                 if client.getpeername() == (data.decode().split(' ')[2], int(data.decode().split(' ')[3])):
                     print("UDP port sent")
                     client.send(("CONN " + conn.getpeername()[0] + " " + data.decode().split(' ')[1]).encode())
+                    client_states[conn] = "chatting"
                     break
 
 
 #Configure Server
 print("Setting up server")
-serverPort = 12005
+serverPort = 12008
 serverSocket = socket(AF_INET, SOCK_STREAM)
 serverSocket.bind(('', serverPort))
 serverSocket.listen(1)

@@ -6,6 +6,7 @@ import threading
 #send message
 def send_message():
     global connected 
+    global clientUDPPort
     while connected:
         message = input()
         
@@ -16,6 +17,12 @@ def send_message():
             serverSocket.sendto(message.split(' ')[1].encode(), clientUDPPort)
             continue
         
+        if message.split(' ')[0] == "STOP":
+            serverSocket.sendto("STOP".encode(), clientUDPPort)
+            clientUDPPort = (0, 0)
+            clientSocket.send("LISTENING".encode())
+            continue
+        
         clientSocket.send(message.encode())
     serverSocket.close()
     clientSocket.close()
@@ -23,8 +30,15 @@ def send_message():
 
 def udp_listner(serverSocket):
     global connected 
+    global clientUDPPort
     while connected:
         msg, clientAddress = serverSocket.recvfrom(2048)
+        if msg.decode() == "STOP":
+            clientSocket.send("LISTENING".encode())
+            print(str(clientUDPPort) + " has stopped chatting, now listening")
+            clientUDPPort = (0, 0)
+            continue
+        
         print(msg.decode())
     print("UDP listener closed")
         
@@ -38,7 +52,7 @@ def tcp_listner():
         if (message.decode().split(' ')[0] == "REQ"):
             clientSocket.send(("UDP " + str(UDPPort) + " " + message.decode().split(' ')[1] + " " + message.decode().split(' ')[2]).encode())
             clientUDPPort = (message.decode().split(' ')[1], int(message.decode().split(' ')[2]))
-            clientSocket.send("CHATTING".encode())
+            continue
             
         #UDP port received
         if (message.decode().split(' ')[0] == "CONN"):
@@ -47,6 +61,7 @@ def tcp_listner():
             clientUDPPort = (message.decode().split(' ')[1], int(message.decode().split(' ')[2]))
             serverSocket.sendto(("Now Chatting on " + str(UDPPort)).encode(), clientUDPPort)
             clientSocket.send("CHATTING".encode())
+            
         
     print("TCP listener closed")
 
@@ -56,7 +71,7 @@ def tcp_start():
     
 #configure client
 serverName = 'localhost'
-serverPort = 12005
+serverPort = 12008
 clientSocket = socket(AF_INET, SOCK_STREAM)
 clientSocket.connect((serverName, serverPort))
 DISCONNECT = 'DISCONNECT'
